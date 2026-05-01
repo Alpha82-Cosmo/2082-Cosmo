@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sgt. Cosmo: Alpha82 Command HQ</title>
+  <style>
+    :root { --green: #39dc6d; --cyan: #00ADEF; --navy: #020B1A; }
+    body { background: #000; color: white; margin: 0; font-family: 'Courier New', monospace; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .tv-frame { width: 95vw; height: 95vh; max-width: 800px; max-height: 600px; border: 15px solid #222; border-radius: 40px; position: relative; background: #050505; box-shadow: inset 0 0 80px #000, 0 0 40px rgba(57, 220, 109, 0.2); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; animation: crt-flicker 0.1s infinite; }
+    @keyframes crt-flicker { 0% { opacity: 0.98; } 50% { opacity: 1; } 100% { opacity: 0.97; } }
+    #matrix-canvas { position: absolute; width: 100%; height: 100%; opacity: 0.5; z-index: 1; display:none; }
+    
+    #start-container { z-index: 30; border: 3px solid var(--green); box-shadow: 0 0 20px var(--green); padding: 20px; cursor: pointer; transition: transform 0.2s; background: rgba(0, 20, 0, 0.3); border-radius: 10px; display: flex; justify-content: center; align-items: center; }
+    #start-container:hover { transform: scale(1.05); background: rgba(0, 40, 0, 0.5); }
+    #init-logo { width: 250px; filter: drop-shadow(0 0 15px var(--cyan)); display: block; }
+    
+    #hud-content { position: relative; z-index: 10; display: none; flex-direction: column; align-items: center; width: 90%; }
+    .logo { width: 250px; margin-bottom: 10px; filter: drop-shadow(0 0 15px var(--cyan)); transition: all 0.3s ease; }
+    .terminal { background: rgba(0,0,0,0.9); padding: 15px; border: 1px solid var(--cyan); color: var(--cyan); margin-bottom: 15px; font-weight: bold; width: 100%; text-align: center; overflow: hidden; min-height: 25px; }
+    
+    .input-row { display: flex; width: 85%; gap: 10px; margin-bottom: 15px; }
+    .bark-box { background: rgba(0,0,0,0.7); border: 2px solid var(--green); color: var(--green); padding: 12px; width: 100%; font-family: 'Courier New', monospace; outline: none; font-size: 16px; }
+    .mic-btn, .stealth-btn { background: #222; border: 2px solid var(--cyan); color: white; padding: 0 15px; font-size: 1.5rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+    .mic-btn:hover, .stealth-btn:hover { background: var(--cyan); color: black; }
+    
+    .sniff-btn { background: var(--green); border: none; padding: 15px 40px; font-weight: 900; cursor: pointer; color: var(--navy); text-transform: uppercase; letter-spacing: 2px; }
+    .sniff-btn:hover { background: white; }
+
+    .ticker-wrap { width: 100%; overflow: hidden; white-space: nowrap; box-sizing: border-box; }
+    .ticker-text { display: inline-block; padding-left: 100%; }
+    .ticker-text:hover, .ticker-text:active { animation-play-state: paused !important; color: #fff; cursor: pointer; }
+    @keyframes scroll-ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+  </style>
+</head>
+<body>
+  <div class="tv-frame">
+    <canvas id="matrix-canvas"></canvas>
+    
+    <div id="start-container" onclick="runHackSequence()">
+      <img id="init-logo" src="https://drive.google.com/thumbnail?id=1oVl0afowsVSkh_KV3hxVL01Xmf4YSsdd&sz=w500">
+    </div>
+    
+    <div id="hud-content">
+      <img id="cosmo-visual" src="https://drive.google.com/thumbnail?id=1ElI-BhVIDj_d-4SEFtKMP8-OgYS7JeVT&sz=w500" class="logo">
+      <div class="terminal" id="output">SYSTEMS STANDBY</div>
+      
+      <div class="input-row">
+        <input type="text" id="bark-input" class="bark-box" placeholder="TYPE OR SPEAK COMMAND...">
+        <button class="mic-btn" onclick="toggleMic()" title="Voice Command">🎤</button>
+        <button class="stealth-btn" id="stealth-btn" onclick="toggleStealth()" title="Stealth Mode">🔊</button>
+      </div>
+      
+      <button class="sniff-btn" onclick="fetchAI()">ENGAGE BRAIN</button>
+    </div>
+  </div>
+  <script>
+    // THE RADIO FREQUENCY
+    const COSMO_API_URL = "https://script.google.com/macros/s/AKfycbyp-ZQ5FqvTzkQr8AKBHUqLsHBVCPzUfu_boH6aMSfMNacjP9W2UALK3V_TKyAwYaGb/exec";
+
+    const synth = window.speechSynthesis;
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+    const visual = document.getElementById('cosmo-visual');
+    let isStealth = false;
+    
+    // --- STEALTH MODE TOGGLE ---
+    function toggleStealth() {
+      isStealth = !isStealth;
+      document.getElementById('stealth-btn').innerText = isStealth ? "🔇" : "🔊";
+      if (isStealth) synth.cancel(); // Cuts the voice instantly
+    }
+
+    // --- VOICE RECOGNITION SETUP ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-GB';
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('bark-input').value = transcript;
+        fetchAI(); 
+      };
+
+      recognition.onerror = function(event) {
+        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> MIC ERROR: ' + event.error + '</div></div>';
+      };
+    }
+
+    function toggleMic() {
+      if (isStealth) {
+        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> MIC DISABLED IN STEALTH MODE. TYPE COMMAND.</div></div>';
+        return;
+      }
+      if (recognition) {
+        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> LISTENING... SPEAK NOW, ALPHA.</div></div>';
+        recognition.start();
+      } else {
+        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> VOICE COMMS NOT SUPPORTED IN THIS BROWSER.</div></div>';
+      }
+    }
+    
+    // --- UI SETUP ---
+    function runHackSequence() {
+      document.getElementById('start-container').style.display = 'none';
+      canvas.style.display = 'block';
+      initMatrix();
+      setTimeout(() => {
+        document.getElementById('hud-content').style.display = 'flex';
+        cosmoTalk("A-up Alpha! Neural network is online. Speak your command!");
+      }, 1500);
+    }
+    
+    function initMatrix() {
+      canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+      let fontSize = 18; let columns = canvas.width / fontSize; let drops = [];
+      for (let x = 0; x < columns; x++) drops[x] = 1;
+      let characters = "ｦｱｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ1234567890".split("");
+      setInterval(() => {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.1)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#39dc6d"; ctx.font = fontSize + "px monospace";
+        for (let i = 0; i < drops.length; i++) {
+          const text = characters[Math.floor(Math.random() * characters.length)];
+          ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+          if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+          drops[i]++;
+        }
+      }, 40);
+    }
+    
+    function cosmoTalk(text) {
+      // SMART TICKER
+      let animSeconds = Math.max(8, text.length / 10); 
+      document.getElementById('output').innerHTML = 
+        '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker ' + animSeconds + 's linear infinite;">' + text + '</div></div>';
+      
+      visual.src = "https://drive.google.com/thumbnail?id=1ElI-BhVIDj_d-4SEFtKMP8-OgYS7JeVT&sz=w500"; 
+      
+      // ONLY SPEAKS IF STEALTH IS OFF
+      if (!isStealth) {
+        synth.cancel(); 
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.pitch = 0.4; utter.rate = 0.85;
+        synth.speak(utter);
+      }
+    }
+    
+    function fetchAI() {
+      const val = document.getElementById('bark-input').value;
+      visual.src = "https://drive.google.com/thumbnail?id=1qyONNPpmZi56PhJ6_Bz5RLJ-uwhjpDra&sz=w500"; 
+      
+      document.getElementById('output').innerHTML = 
+        '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 4s linear infinite;">>>> RADIO SIGNAL TRANSMITTING...</div></div>';
+      
+      // THE NEW SECURE FETCH PROTOCOL
+      fetch(COSMO_API_URL, {
+        redirect: "follow",
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ query: val || "Yorkshire greeting" })
+      })
+      .then(response => response.json())
+      .then(data => {
+        cosmoTalk(data.reply);
+      })
+      .catch(error => {
+        document.getElementById('output').innerHTML = 
+          '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 6s linear infinite;">>>> RADIO TOWER DISCONNECTED. Check connection!</div></div>';
+      });
+    }
+  </script>
+</body>
+</html>
