@@ -54,7 +54,7 @@
     </div>
   </div>
   <script>
-    // THE RADIO FREQUENCY
+    // YOUR EXACT RADIO FREQUENCY
     const COSMO_API_URL = "https://script.google.com/macros/s/AKfycbyp-ZQ5FqvTzkQr8AKBHUqLsHBVCPzUfu_boH6aMSfMNacjP9W2UALK3V_TKyAwYaGb/exec";
 
     const synth = window.speechSynthesis;
@@ -63,14 +63,12 @@
     const visual = document.getElementById('cosmo-visual');
     let isStealth = false;
     
-    // --- STEALTH MODE TOGGLE ---
     function toggleStealth() {
       isStealth = !isStealth;
       document.getElementById('stealth-btn').innerText = isStealth ? "🔇" : "🔊";
-      if (isStealth) synth.cancel(); // Cuts the voice instantly
+      if (isStealth) synth.cancel(); 
     }
 
-    // --- VOICE RECOGNITION SETUP ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
     if (SpeechRecognition) {
@@ -103,7 +101,6 @@
       }
     }
     
-    // --- UI SETUP ---
     function runHackSequence() {
       document.getElementById('start-container').style.display = 'none';
       canvas.style.display = 'block';
@@ -132,14 +129,12 @@
     }
     
     function cosmoTalk(text) {
-      // SMART TICKER
       let animSeconds = Math.max(8, text.length / 10); 
       document.getElementById('output').innerHTML = 
         '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker ' + animSeconds + 's linear infinite;">' + text + '</div></div>';
       
       visual.src = "https://drive.google.com/thumbnail?id=1ElI-BhVIDj_d-4SEFtKMP8-OgYS7JeVT&sz=w500"; 
       
-      // ONLY SPEAKS IF STEALTH IS OFF
       if (!isStealth) {
         synth.cancel(); 
         const utter = new SpeechSynthesisUtterance(text);
@@ -155,16 +150,24 @@
       document.getElementById('output').innerHTML = 
         '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 4s linear infinite;">>>> RADIO SIGNAL TRANSMITTING...</div></div>';
       
-      // THE NEW SECURE FETCH PROTOCOL
       fetch(COSMO_API_URL, {
         redirect: "follow",
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ 
           query: val || "Yorkshire greeting",
-          pawshake: "AR_BUZZ_ALPHA_82_LOCKED" // Must match the backend exactly!
+          pawshake: "AR_BUZZ_ALPHA_82_LOCKED" 
         })
       })
+      .then(response => response.json())
+      .then(data => {
+        cosmoTalk(data.reply);
+      })
+      .catch(error => {
+        document.getElementById('output').innerHTML = 
+          '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 6s linear infinite;">>>> RADIO TOWER DISCONNECTED. Check connection!</div></div>';
+      });
+    }
   </script>
 </body>
 </html>
