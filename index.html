@@ -160,17 +160,11 @@
         redirect: "follow",
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ query: val || "Yorkshire greeting" })
+        body: JSON.stringify({ 
+          query: val || "Yorkshire greeting",
+          pawshake: "AR_BUZZ_ALPHA_82_LOCKED" // Must match the backend exactly!
+        })
       })
-      .then(response => response.json())
-      .then(data => {
-        cosmoTalk(data.reply);
-      })
-      .catch(error => {
-        document.getElementById('output').innerHTML = 
-          '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 6s linear infinite;">>>> RADIO TOWER DISCONNECTED. Check connection!</div></div>';
-      });
-    }
   </script>
 </body>
 </html>
