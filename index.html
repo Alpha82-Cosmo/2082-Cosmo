@@ -23,6 +23,10 @@
     .mic-btn, .stealth-btn { background: #222; border: 2px solid var(--cyan); color: white; padding: 0 15px; font-size: 1.5rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
     .mic-btn:hover, .stealth-btn:hover { background: var(--cyan); color: black; }
     
+    /* New styling for active recording */
+    .mic-active { background: red !important; border-color: darkred !important; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
     .sniff-btn { background: var(--green); border: none; padding: 15px 40px; font-weight: 900; cursor: pointer; color: var(--navy); text-transform: uppercase; letter-spacing: 2px; }
     .sniff-btn:hover { background: white; }
 
@@ -46,7 +50,7 @@
       
       <div class="input-row">
         <input type="text" id="bark-input" class="bark-box" placeholder="TYPE OR SPEAK COMMAND...">
-        <button class="mic-btn" onclick="toggleMic()" title="Voice Command">🎤</button>
+        <button id="mic-btn" class="mic-btn" onclick="toggleMic()" title="Voice Command">🎤</button>
         <button class="stealth-btn" id="stealth-btn" onclick="toggleStealth()" title="Stealth Mode">🔊</button>
       </div>
       
@@ -54,8 +58,9 @@
     </div>
   </div>
   <script>
-    // YOUR EXACT RADIO FREQUENCY
+    // --- YOUR KEYS & URLS ---
     const COSMO_API_URL = "https://script.google.com/macros/s/AKfycbw0Icort_cBrYc06uDvpYtuE0FR-a7uE_pcSHO1khFK71M2vZ5feu4q8z5G6B-0z-sW/exec";
+    const DEEPGRAM_API_KEY = "20044f435b8e105f507014c863b1391b4ad341f6";
 
     const synth = window.speechSynthesis;
     const canvas = document.getElementById('matrix-canvas');
@@ -63,51 +68,113 @@
     const visual = document.getElementById('cosmo-visual');
     let isStealth = false;
     
+    // --- DEEPGRAM AUDIO VARIABLES ---
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+    
     function toggleStealth() {
       isStealth = !isStealth;
       document.getElementById('stealth-btn').innerText = isStealth ? "🔇" : "🔊";
       if (isStealth) synth.cancel(); 
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition;
-    if (SpeechRecognition) {
-      recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-GB';
-
-      recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript;
-        document.getElementById('bark-input').value = transcript;
-        fetchAI(); 
-      };
-
-      recognition.onerror = function(event) {
-        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> MIC ERROR: ' + event.error + '</div></div>';
-      };
-    }
-
-    function toggleMic() {
+    // ==========================================
+    // 🩸 THE BLOODHOUND EARS (Deepgram Integration)
+    // ==========================================
+    async function toggleMic() {
       if (isStealth) {
         document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> MIC DISABLED IN STEALTH MODE. TYPE COMMAND.</div></div>';
         return;
       }
-      if (recognition) {
-        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> LISTENING... SPEAK NOW, ALPHA.</div></div>';
-        recognition.start();
+
+      const micBtn = document.getElementById('mic-btn');
+
+      if (isRecording) {
+        // STOP RECORDING & PROCESS
+        mediaRecorder.stop();
+        isRecording = false;
+        micBtn.classList.remove('mic-active');
+        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> DEEPGRAM ANALYZING VOICES... STANDBY.</div></div>';
       } else {
-        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> VOICE COMMS NOT SUPPORTED IN THIS BROWSER.</div></div>';
+        // START RECORDING
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          mediaRecorder.addEventListener("dataavailable", event => {
+            audioChunks.push(event.data);
+          });
+
+          mediaRecorder.addEventListener("stop", async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            await processDeepgram(audioBlob);
+            // Turn off the red recording light on the browser tab
+            stream.getTracks().forEach(track => track.stop());
+          });
+
+          mediaRecorder.start();
+          isRecording = true;
+          micBtn.classList.add('mic-active');
+          document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔴 EARS OPEN. TRACKING VOICES... PRESS MIC TO STOP.</div></div>';
+        } catch (err) {
+          document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> MIC ACCESS DENIED. CHECK BROWSER PERMISSIONS.</div></div>';
+        }
       }
     }
-    
+
+    async function processDeepgram(blob) {
+       try {
+           // We use Nova-2 model, Smart Formatting, and Diarize (Speaker separation)
+           const response = await fetch("https://api.deepgram.com/v1/listen?diarize=true&model=nova-2&smart_format=true", {
+               method: "POST",
+               headers: {
+                   "Authorization": `Token ${DEEPGRAM_API_KEY}`,
+                   "Content-Type": "audio/webm"
+               },
+               body: blob
+           });
+           
+           const data = await response.json();
+           
+           if (!data.results) { throw new Error("No transcription data"); }
+
+           const words = data.results.channels[0].alternatives[0].words;
+           let finalTranscript = "";
+           let currentSpeaker = -1;
+
+           // --- THE TENNIS MATCH LOGIC ---
+           // Speaker 0 is always Alpha (because you speak first). Everyone else is Client.
+           words.forEach(wordObj => {
+               if(wordObj.speaker !== currentSpeaker) {
+                   currentSpeaker = wordObj.speaker;
+                   let speakerName = (currentSpeaker === 0) ? "[ALPHA]" : "[CLIENT]";
+                   finalTranscript += ` ${speakerName}: `;
+               }
+               finalTranscript += wordObj.punctuated_word + " ";
+           });
+
+           // Put the perfectly tagged text into the box and send it to the Brain
+           document.getElementById('bark-input').value = finalTranscript.trim();
+           fetchAI();
+
+       } catch (e) {
+           console.error(e);
+           document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> DEEPGRAM ERROR. SCENT LOST.</div></div>';
+       }
+    }
+
+    // ==========================================
+    // 📺 UI & ENGINE FUNCTIONS
+    // ==========================================
     function runHackSequence() {
       document.getElementById('start-container').style.display = 'none';
       canvas.style.display = 'block';
       initMatrix();
       setTimeout(() => {
         document.getElementById('hud-content').style.display = 'flex';
-        cosmoTalk("A-up Alpha! Neural network is online. Speak your command!");
+        cosmoTalk("A-up Alpha! Bloodhound Ears are online. Speak your command!");
       }, 1500);
     }
     
