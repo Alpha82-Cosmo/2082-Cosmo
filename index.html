@@ -219,6 +219,7 @@
         const data = await response.json();
         const cosmoReply = data.reply;
 
+        // Display the text on screen first
         outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + '</div></div>';
 
         // --- PLAY THE DEEPGRAM UK MALE VOICE ---
@@ -238,10 +239,20 @@
               },
               body: JSON.stringify({ text: cosmoReply })
             });
-            const audioBlob = await audioRes.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            audio.play();
+
+            if (!audioRes.ok) {
+               // Deepgram rejected it. Print the error code to the screen!
+               outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + ' [DEEPGRAM VOICE ERROR: ' + audioRes.status + ']</div></div>';
+            } else {
+               const audioBlob = await audioRes.blob();
+               const audioUrl = URL.createObjectURL(audioBlob);
+               const audio = new Audio(audioUrl);
+               
+               // Try to play. If browser blocks it, print to screen!
+               audio.play().catch(e => {
+                  outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + ' [BROWSER BLOCKED AUDIO PLAYBACK]</div></div>';
+               });
+            }
           }
         }
       } catch (err) {
