@@ -126,7 +126,7 @@
           isRecording = false;
           micBtn.classList.remove('mic-active');
           micBtn.innerText = "🎤";
-          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> TRANSMISSION ERROR: CHECK VAULT OR MIC CONFIG.</div></div>';
+          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> ERROR: ' + err.message.toUpperCase() + '</div></div>';
         }
 
       } else {
