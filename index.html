@@ -66,103 +66,90 @@
     const canvas = document.getElementById('matrix-canvas');
     const ctx = canvas.getContext('2d');
     const visual = document.getElementById('cosmo-visual');
-    let isStealth = false;
-    
-    // --- DEEPGRAM AUDIO VARIABLES ---
-    let mediaRecorder;
-    let audioChunks = [];
+    let stealthMode = false;
     let isRecording = false;
-    
+    let deepgramSocket;
+    let tempDeepgramToken = ""; 
+    let mediaRecorder;
+
     function toggleStealth() {
-      isStealth = !isStealth;
-      document.getElementById('stealth-btn').innerText = isStealth ? "🔇" : "🔊";
-      if (isStealth) synth.cancel(); 
+      stealthMode = !stealthMode;
+      document.getElementById('stealth-btn').innerText = stealthMode ? "🔇" : "🔊";
+      if (stealthMode) window.speechSynthesis.cancel();
     }
 
-    // ==========================================
-    // 🩸 THE BLOODHOUND EARS (Deepgram Integration)
-    // ==========================================
     async function toggleMic() {
-      if (isStealth) {
-        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> MIC DISABLED IN STEALTH MODE. TYPE COMMAND.</div></div>';
-        return;
-      }
-
       const micBtn = document.getElementById('mic-btn');
+      const inputBox = document.getElementById('bark-input');
+      const outputTicker = document.getElementById('output');
 
-      if (isRecording) {
-        // STOP RECORDING & PROCESS
-        mediaRecorder.stop();
-        isRecording = false;
-        micBtn.classList.remove('mic-active');
-        document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> DEEPGRAM ANALYZING VOICES... STANDBY.</div></div>';
-      } else {
-        // START RECORDING
+      if (!isRecording) {
+        isRecording = true;
+        micBtn.classList.add('mic-active');
+        micBtn.innerText = "🛑";
+        inputBox.value = "";
+        
+        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔒 SECURING BURNER PASS FROM GOOGLE VAULT...</div></div>';
+
         try {
+          const tokenRes = await fetch(COSMO_API_URL + "?request=deepgram_token&pawshake=AR_BUZZ_ALPHA_82_LOCKED");
+          const tokenData = await tokenRes.json();
+          if (!tokenData.success) throw new Error("Vault access denied: " + tokenData.error);
+          tempDeepgramToken = tokenData.token;
+
+          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔴 EARS OPEN. STREAMING TO DEEPGRAM... SPEAK NOW.</div></div>';
+
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
-          audioChunks = [];
+          deepgramSocket = new WebSocket("wss://api.deepgram.com/v1/listen?punctuate=true&diarize=true", ["token", tempDeepgramToken]);
 
-          mediaRecorder.addEventListener("dataavailable", event => {
-            audioChunks.push(event.data);
-          });
+          deepgramSocket.onopen = () => {
+            mediaRecorder.addEventListener('dataavailable', event => {
+              if (event.data.size > 0 && deepgramSocket.readyState === 1) {
+                deepgramSocket.send(event.data);
+              }
+            });
+            mediaRecorder.start(250); 
+          };
 
-          mediaRecorder.addEventListener("stop", async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            await processDeepgram(audioBlob);
-            // Turn off the red recording light on the browser tab
-            stream.getTracks().forEach(track => track.stop());
-          });
+          deepgramSocket.onmessage = (message) => {
+            const received = JSON.parse(message.data);
+            if (received.channel && received.channel.alternatives[0]) {
+              const transcript = received.channel.alternatives[0].transcript;
+              if (transcript && received.is_final) {
+                inputBox.value += transcript + " "; 
+              }
+            }
+          };
 
-          mediaRecorder.start();
-          isRecording = true;
-          micBtn.classList.add('mic-active');
-          document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔴 EARS OPEN. TRACKING VOICES... PRESS MIC TO STOP.</div></div>';
         } catch (err) {
-          document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> MIC ACCESS DENIED. CHECK BROWSER PERMISSIONS.</div></div>';
+          isRecording = false;
+          micBtn.classList.remove('mic-active');
+          micBtn.innerText = "🎤";
+          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> TRANSMISSION ERROR: CHECK VAULT OR MIC CONFIG.</div></div>';
+        }
+
+      } else {
+        isRecording = false;
+        micBtn.classList.remove('mic-active');
+        micBtn.innerText = "🎤";
+        
+        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 📡 RELAYING COMMAND DATA TO RADIO TOWER... STANDBY.</div></div>';
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+          mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+        if (deepgramSocket) deepgramSocket.close();
+
+        // This triggers your existing fetchAI function to send the data to Google
+        if (inputBox.value.trim() !== "") {
+          fetchAI();
+        } else {
+          inputBox.placeholder = "TYPE OR SPEAK COMMAND...";
+          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> SYSTEM IDLE. STANDING AT HEEL.</div></div>';
         }
       }
-    }
-
-    async function processDeepgram(blob) {
-       try {
-           // We use Nova-2 model, Smart Formatting, and Diarize (Speaker separation)
-           const response = await fetch("https://api.deepgram.com/v1/listen?diarize=true&model=nova-2&smart_format=true", {
-               method: "POST",
-               headers: {
-                   "Authorization": `Token ${DEEPGRAM_API_KEY}`,
-                   "Content-Type": "audio/webm"
-               },
-               body: blob
-           });
-           
-           const data = await response.json();
-           
-           if (!data.results) { throw new Error("No transcription data"); }
-
-           const words = data.results.channels[0].alternatives[0].words;
-           let finalTranscript = "";
-           let currentSpeaker = -1;
-
-           // --- THE TENNIS MATCH LOGIC ---
-           // Speaker 0 is always Alpha (because you speak first). Everyone else is Client.
-           words.forEach(wordObj => {
-               if(wordObj.speaker !== currentSpeaker) {
-                   currentSpeaker = wordObj.speaker;
-                   let speakerName = (currentSpeaker === 0) ? "[ALPHA]" : "[CLIENT]";
-                   finalTranscript += ` ${speakerName}: `;
-               }
-               finalTranscript += wordObj.punctuated_word + " ";
-           });
-
-           // Put the perfectly tagged text into the box and send it to the Brain
-           document.getElementById('bark-input').value = finalTranscript.trim();
-           fetchAI();
-
-       } catch (e) {
-           console.error(e);
-           document.getElementById('output').innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> DEEPGRAM ERROR. SCENT LOST.</div></div>';
-       }
     }
 
     // ==========================================
