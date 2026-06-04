@@ -89,7 +89,7 @@
         micBtn.innerText = "🛑";
         inputBox.value = "";
         
-        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔒 SECURING BURNER PASS FROM GOOGLE VAULT...</div></div>';
+        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔒 SECURING BURNER PASS...</div></div>';
 
         try {
           const tokenRes = await fetch(COSMO_API_URL + "?request=deepgram_token&pawshake=AR_BUZZ_ALPHA_82_LOCKED");
@@ -97,105 +97,13 @@
           if (!tokenData.success) throw new Error("Vault access denied: " + tokenData.error);
           tempDeepgramToken = tokenData.token;
 
-          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔴 EARS OPEN. STREAMING TO DEEPGRAM... SPEAK NOW.</div></div>';
+          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 🔴 EARS OPEN. STREAMING... SPEAK NOW.</div></div>';
 
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
-          deepgramSocket = new WebSocket("wss://api.deepgram.com/v1/listen?punctuate=true&diarize=true", ["token", tempDeepgramToken]);
-
-          deepgramSocket.onopen = () => {
-            mediaRecorder.addEventListener('dataavailable', event => {
-              if (event.data.size > 0 && deepgramSocket.readyState === 1) {
-                deepgramSocket.send(event.data);
-              }
-            });
-            mediaRecorder.start(250); 
-          };
-
-          deepgramSocket.onmessage = (message) => {
-            const received = JSON.parse(message.data);
-            if (received.channel && received.channel.alternatives[0]) {
-              const transcript = received.channel.alternatives[0].transcript;
-              if (transcript && received.is_final) {
-                inputBox.value += transcript + " "; 
-              }
-            }
-          };
-
-        } catch (err) {
-          isRecording = false;
-          micBtn.classList.remove('mic-active');
-          micBtn.innerText = "🎤";
-          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> ERROR: ' + err.message.toUpperCase() + '</div></div>';
-        }
-
-      } else {
-        isRecording = false;
-        micBtn.classList.remove('mic-active');
-        micBtn.innerText = "🎤";
-        
-        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 📡 RELAYING COMMAND DATA TO RADIO TOWER... STANDBY.</div></div>';
-
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-          mediaRecorder.stream.getTracks().forEach(track => track.stop());
-        }
-        if (deepgramSocket) deepgramSocket.close();
-
-        // This triggers your existing fetchAI function to send the data to Google
-        if (inputBox.value.trim() !== "") {
-          fetchAI();
-        } else {
-          inputBox.placeholder = "TYPE OR SPEAK COMMAND...";
-          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> SYSTEM IDLE. STANDING AT HEEL.</div></div>';
-        }
-      }
-    }
-
-    // ==========================================
-    // 📺 UI & ENGINE FUNCTIONS
-    // ==========================================
-    function runHackSequence() {
-      document.getElementById('start-container').style.display = 'none';
-      canvas.style.display = 'block';
-      initMatrix();
-      setTimeout(() => {
-        document.getElementById('hud-content').style.display = 'flex';
-        cosmoTalk("A-up Alpha! Bloodhound Ears are online. Speak your command!");
-      }, 1500);
-    }
-    
-    function initMatrix() {
-      canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
-      let fontSize = 18; let columns = canvas.width / fontSize; let drops = [];
-      for (let x = 0; x < columns; x++) drops[x] = 1;
-      let characters = "ｦｱｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ1234567890".split("");
-      setInterval(() => {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.1)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#39dc6d"; ctx.font = fontSize + "px monospace";
-        for (let i = 0; i < drops.length; i++) {
-          const text = characters[Math.floor(Math.random() * characters.length)];
-          ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-          if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-          drops[i]++;
-        }
-      }, 40);
-    }
-    
-    function cosmoTalk(text) {
-      let animSeconds = Math.max(8, text.length / 10); 
-      document.getElementById('output').innerHTML = 
-        '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker ' + animSeconds + 's linear infinite;">' + text + '</div></div>';
-      
-      visual.src = "https://drive.google.com/thumbnail?id=1ElI-BhVIDj_d-4SEFtKMP8-OgYS7JeVT&sz=w500"; 
-      
-      if (!isStealth) {
-        synth.cancel(); 
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.pitch = 0.4; utter.rate = 0.85;
-        synth.speak(utter);
-      }
-    }
+          
+          // Added model=nova-2 to force Deepgram to use its smartest brain
+          deepgramSocket = new WebSocket("wss://
     
     async function fetchAI() {
       const inputBox = document.getElementById('bark-input');
