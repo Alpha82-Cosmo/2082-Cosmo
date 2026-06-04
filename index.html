@@ -102,7 +102,7 @@
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
           
-          deepgramSocket = new WebSocket("wss://api.deepgram.com/v1/listen?punctuate=true&diarize=true", ["token", tempDeepgramToken]);
+          deepgramSocket = new WebSocket("wss://api.deepgram.com/v1/listen?smart_format=true&diarize=true", ["token", tempDeepgramToken]);
 
           deepgramSocket.onopen = () => {
             mediaRecorder.addEventListener('dataavailable', event => {
@@ -120,6 +120,18 @@
               if (transcript && received.is_final) {
                 inputBox.value += transcript + " "; 
               }
+            }
+          };
+
+          // Diagnostic Sniffer: Alerts you if the stream hits an error
+          deepgramSocket.onerror = (err) => {
+            outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> ⚠️ AUDIO STREAM FAULT DETECTED.</div></div>';
+          };
+
+          // Diagnostic Sniffer: Catches if Deepgram forcefully drops the connection
+          deepgramSocket.onclose = (event) => {
+            if (isRecording && inputBox.value.trim() === "") {
+               outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 📡 CONNECTION CLOSED BY SERVER. CODE: ' + event.code + '</div></div>';
             }
           };
 
@@ -143,19 +155,17 @@
         }
         if (deepgramSocket) deepgramSocket.close();
 
-        if (inputBox.value.trim() !== "") {
-          fetchAI();
-        } else {
-          inputBox.placeholder = "TYPE OR SPEAK COMMAND...";
-          outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> SYSTEM IDLE. STANDING AT HEEL.</div></div>';
-        }
+        // Small delay to catch any lingering data buffers cleanly
+        setTimeout(() => {
+          const finalCommand = inputBox.value.trim();
+          if (finalCommand !== "") {
+            fetchAI();
+          } else {
+            inputBox.placeholder = "TYPE OR SPEAK COMMAND...";
+            outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> SYSTEM IDLE. STANDING AT HEEL.</div></div>';
+          }
+        }, 500);
       }
-    }
-
-    function runHackSequence() {
-      document.getElementById('start-container').style.display = 'none';
-      document.getElementById('hud-content').style.display = 'flex';
-      document.getElementById('matrix-canvas').style.display = 'block';
     }
     
     async function fetchAI() {
