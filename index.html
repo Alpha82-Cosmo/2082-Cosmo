@@ -123,15 +123,13 @@
             }
           };
 
-          // Diagnostic Sniffer: Alerts you if the stream hits an error
           deepgramSocket.onerror = (err) => {
-            outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> ⚠️ AUDIO STREAM FAULT DETECTED.</div></div>';
+            console.error("Stream error:", err);
           };
 
-          // Diagnostic Sniffer: Catches if Deepgram forcefully drops the connection
           deepgramSocket.onclose = (event) => {
             if (isRecording && inputBox.value.trim() === "") {
-               outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 📡 CONNECTION CLOSED BY SERVER. CODE: ' + event.code + '</div></div>';
+               outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 📡 STREAM DISCONNECTED. CODE: ' + event.code + '</div></div>';
             }
           };
 
@@ -155,7 +153,6 @@
         }
         if (deepgramSocket) deepgramSocket.close();
 
-        // Small delay to catch any lingering data buffers cleanly
         setTimeout(() => {
           const finalCommand = inputBox.value.trim();
           if (finalCommand !== "") {
@@ -167,7 +164,14 @@
         }, 500);
       }
     }
-    
+
+    function runHackSequence() {
+      document.getElementById('start-container').style.display = 'none';
+      document.getElementById('hud-content').style.display = 'flex';
+      document.getElementById('matrix-canvas').style.display = 'block';
+      if (typeof initMatrix === 'function') initMatrix();
+    }
+
     async function fetchAI() {
       const inputBox = document.getElementById('bark-input');
       const outputTicker = document.getElementById('output');
@@ -190,10 +194,8 @@
         const data = await response.json();
         const cosmoReply = data.reply;
 
-        // Display the text on screen first
         outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + '</div></div>';
 
-        // --- PLAY THE DEEPGRAM UK MALE VOICE ---
         if (!stealthMode) {
           if (!tempDeepgramToken) {
             const tokenRes = await fetch(COSMO_API_URL + "?request=deepgram_token&pawshake=AR_BUZZ_ALPHA_82_LOCKED");
@@ -212,14 +214,11 @@
             });
 
             if (!audioRes.ok) {
-               // Deepgram rejected it. Print the error code to the screen!
                outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + ' [DEEPGRAM VOICE ERROR: ' + audioRes.status + ']</div></div>';
             } else {
                const audioBlob = await audioRes.blob();
                const audioUrl = URL.createObjectURL(audioBlob);
                const audio = new Audio(audioUrl);
-               
-               // Try to play. If browser blocks it, print to screen!
                audio.play().catch(e => {
                   outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + ' [BROWSER BLOCKED AUDIO PLAYBACK]</div></div>';
                });
