@@ -53,12 +53,12 @@
         <input type="text" id="bark-input" class="bark-box" placeholder="TYPE OR SPEAK COMMAND...">
         <button id="mic-btn" class="mic-btn" onclick="toggleMic()" title="Voice Command">🎤</button>
         <button class="stealth-btn" id="stealth-btn" onclick="toggleStealth()" title="Stealth Mode">🔊</button>
-      </div> <iframe 
-        src="https://www.appsheet.com/start/acb46b94-950b-4eac-90a8-851d2fdd2d63" 
-        width="100%" 
-        height="300px" 
-        style="border: 2px solid var(--green); border-radius: 8px; margin-top: 15px; background: #000;">
-      </iframe>
+      </div> <div id="husky-hud-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center;">
+        <div style="position: relative; width: 90%; max-width: 400px; height: 80vh; border: 3px solid var(--green); border-radius: 20px; background: #000; overflow: hidden; display: flex; flex-direction: column;">
+          <button onclick="document.getElementById('husky-hud-overlay').style.display = 'none'" style="background: red; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; font-family: monospace;">[X] CLOSE HUD</button>
+          <iframe src="https://www.appsheet.com/start/acb46b94-950b-4eac-90a8-851d2fdd2d63" width="100%" height="100%" style="border: none; background: #000;"></iframe>
+        </div>
+      </div>
       
       <button class="sniff-btn" onclick="fetchAI()">ENGAGE BRAIN</button>
     </div>
@@ -198,6 +198,11 @@
         
         const data = await response.json();
         const cosmoReply = data.reply;
+        
+        // 🟢 IF THE COMMAND OR THE REPLY MARKS A LOOKUP, POP OPEN THE HUD
+        if (cosmoReply.toUpperCase().includes("HUD_LOOKUP_SUCCESS") || textCommand.toUpperCase().includes("LOOK UP")) {
+          document.getElementById('husky-hud-overlay').style.display = 'flex';
+        }
 
         outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + '</div></div>';
 
