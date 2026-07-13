@@ -74,6 +74,16 @@
       <button class="sniff-btn" onclick="fetchAI()">ENGAGE BRAIN</button>
     </div>
   </div>
+  <!-- 🟢 DYNAMIC LIVE COCKPIT POPUP OVERLAY -->
+    <div id="husky-hud-modal" class="hud-modal">
+      <div class="modal-header">
+        <span id="hud-modal-title" class="modal-title">📊 KENNEL TARGET LOOKUP</span>
+        <button class="close-btn" onclick="closeHudModal()">[X]</button>
+      </div>
+      <table class="hud-table" id="hud-modal-table">
+        <!-- Script injects data profiles vertically right here -->
+      </table>
+    </div>
   <script>
     // --- YOUR KEYS & URLS ---
     const COSMO_API_URL = "https://script.google.com/macros/s/AKfycbxBWLqXeo8MXRFMo29aj90_XCIJRD8PA-oiSxCaYGeh3h2IVkSSyC1xJa39atZan_O_/exec";
@@ -87,6 +97,9 @@
     let deepgramSocket;
     let tempDeepgramToken = ""; 
     let mediaRecorder;
+    function closeHudModal() {
+      document.getElementById('husky-hud-modal').style.display = 'none';
+    }
 
     function toggleStealth() {
       stealthMode = !stealthMode;
@@ -188,16 +201,13 @@
       if (typeof initMatrix === 'function') initMatrix();
     }
 
-    async function fetchAI() {
+   async function fetchAI() {
       const inputBox = document.getElementById('bark-input');
       const outputTicker = document.getElementById('output');
       const textCommand = inputBox.value.trim();
-
       if (!textCommand) return;
-
       inputBox.value = "";
-      outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> 📡 TRANSMITTING TO RADIO TOWER...</div></div>';
-
+      outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>>> 📡 TRANSMITTING TO RADIO TOWER...</div></div>';
       try {
         const response = await fetch(COSMO_API_URL, {
           method: 'POST',
@@ -210,22 +220,36 @@
         const data = await response.json();
         const cosmoReply = data.reply;
 
-        // 🟢 NATIVE HUD CARD INTERCEPTOR: DROPS RAW TEXT DIRECTLY INTO COCKPIT SCREEN
+        // 🟢 FULLSCREEN HUD MODAL INTERCEPTOR & PARSER
         if (cosmoReply.toUpperCase().includes("CRM HUD SECURED")) {
-          const alertBox = document.getElementById('husky-hud-alert');
-          alertBox.innerHTML = "🦮 " + cosmoReply.toUpperCase();
-          alertBox.style.display = 'block';
+          const parts = cosmoReply.split(" | ");
+          const titleMatch = parts[0].match(/\[(.*?)\]/);
+          const targetID = titleMatch ? titleMatch[1] : "UNKNOWN ID";
+          
+          document.getElementById('hud-modal-title').innerText = "📊 KENNEL PROFILE: " + targetID;
+          
+          let tableContent = "";
+          for (let i = 1; i < parts.length; i++) {
+            const segment = parts[i].replace(" 🦮⚡", "");
+            const splitIdx = segment.indexOf(":");
+            if (splitIdx !== -1) {
+              const label = segment.substring(0, splitIdx).trim();
+              const value = segment.substring(splitIdx + 1).trim();
+              tableContent += `<tr><td class="hud-label">${label}</td><td class="hud-value">${value}</td></tr>`;
+            }
+          }
+          
+          document.getElementById('hud-modal-table').innerHTML = tableContent;
+          document.getElementById('husky-hud-modal').style.display = 'flex';
         }
 
-        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + '</div></div>';
-
+        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>>> ' + cosmoReply.toUpperCase() + '</div></div>';
         if (!stealthMode) {
           if (!tempDeepgramToken) {
             const tokenRes = await fetch(COSMO_API_URL + "?request=deepgram_token&pawshake=AR_BUZZ_ALPHA_82_LOCKED");
             const tokenData = await tokenRes.json();
             if (tokenData.success) tempDeepgramToken = tokenData.token;
           }
-
           if (tempDeepgramToken) {
             const audioRes = await fetch("https://api.deepgram.com/v1/speak?model=aura-helios-en", {
               method: "POST",
@@ -235,21 +259,20 @@
               },
               body: JSON.stringify({ text: cosmoReply })
             });
-
             if (!audioRes.ok) {
-               outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + ' [DEEPGRAM VOICE ERROR: ' + audioRes.status + ']</div></div>';
+               outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>>> ' + cosmoReply.toUpperCase() + ' [DEEPGRAM VOICE ERROR: ' + audioRes.status + ']</div></div>';
             } else {
                const audioBlob = await audioRes.blob();
                const audioUrl = URL.createObjectURL(audioBlob);
                const audio = new Audio(audioUrl);
                audio.play().catch(e => {
-                  outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + ' [BROWSER BLOCKED AUDIO PLAYBACK]</div></div>';
+                  outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>>> ' + cosmoReply.toUpperCase() + ' [BROWSER BLOCKED AUDIO PLAYBACK]</div></div>';
                });
             }
           }
         }
       } catch (err) {
-        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>> SIGNAL LOST. RADAR MALFUNCTION.</div></div>';
+        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 5s linear infinite;">>>>> SIGNAL LOST. RADAR MALFUNCTION.</div></div>';
       }
     }
   </script>
