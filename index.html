@@ -197,14 +197,12 @@
         
         const data = await response.json();
         const cosmoReply = data.reply;
-        
-        // 🟢 TRIGGER POPUP TICKER AND BYPASS SECURITY BLOCK VIA DIRECT WINDOW
-        if (cosmoReply.toUpperCase().includes("HUD_LOOKUP_SUCCESS") || textCommand.toUpperCase().includes("LOOK UP")) {
-          document.getElementById('husky-hud-alert').style.display = 'block';
-          setTimeout(() => {
-            window.open("https://www.appsheet.com/start/acb46b94-950b-4eac-90a8-851d2fdd2d63", "_blank");
-            document.getElementById('husky-hud-alert').style.display = 'none';
-          }, 1000);
+
+        // 🟢 NATIVE HUD CARD INTERCEPTOR: DROPS RAW TEXT DIRECTLY INTO COCKPIT SCREEN
+        if (cosmoReply.toUpperCase().includes("CRM HUD SECURED")) {
+          const alertBox = document.getElementById('husky-hud-alert');
+          alertBox.innerHTML = "🦮 " + cosmoReply.toUpperCase();
+          alertBox.style.display = 'block';
         }
 
         outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>> ' + cosmoReply.toUpperCase() + '</div></div>';
