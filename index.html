@@ -311,9 +311,8 @@
           document.getElementById('hud-modal-table').innerHTML = `<tr><td colspan="2" style="padding: 10px 0 0 0; background: #020B1A;">${cosmoReply}</td></tr>`;
           document.getElementById('husky-hud-modal').style.display = 'flex';
         }
-      }
-       
-     outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>>> ' + cosmoReply.toUpperCase() + '</div></div>';
+
+       outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>>> ' + cosmoReply.toUpperCase() + '</div></div>';
         if (!stealthMode) {
           if (!tempDeepgramToken) {
             const tokenRes = await fetch(COSMO_API_URL + "?request=deepgram_token&pawshake=AR_BUZZ_ALPHA_82_LOCKED");
