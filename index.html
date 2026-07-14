@@ -47,6 +47,66 @@
     .hud-table td { padding: 10px 5px; }
     .hud-label { color: var(--cyan); font-weight: bold; width: 40%; text-transform: uppercase; }
     .hud-value { color: var(--green); font-weight: 900; text-align: left; }
+
+    /* =========================================================================
+   🛸 AR BUZZ CYBER-NEON TACTICAL HUD POPUP OVERLAY
+   ========================================================================= */
+#hud-overlay {
+  display: none; 
+  position: fixed;
+  z-index: 9999; 
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(2, 11, 26, 0.85); /* Night Navy with heavy opacity */
+  backdrop-filter: blur(6px) saturate(180%); /* Futuristic frosted glass */
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-modal-card {
+  background: #020B1A; /* Night Navy Base */
+  border: 2px solid #39dc6d; /* Electric Green Neon Piping */
+  box-shadow: 0 0 25px rgba(57, 220, 109, 0.25), inset 0 0 15px rgba(0, 173, 239, 0.1); /* Green glow outside, Cyan inside */
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  padding: 20px;
+  position: relative;
+  animation: cyberSlideIn 0.35s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+.hud-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 15px;
+  background: transparent;
+  border: 1px solid #00ADEF; /* Vivid Cyan border */
+  color: #72FAD2; /* Glass Highlight text */
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.25s ease;
+}
+
+.hud-close-btn:hover {
+  background: rgba(0, 173, 239, 0.2);
+  color: #39dc6d; /* Electric Green on hover */
+  border-color: #39dc6d;
+  box-shadow: 0 0 12px rgba(57, 220, 109, 0.5);
+}
+
+@keyframes cyberSlideIn {
+  from { opacity: 0; transform: translateY(-30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+    
     </style>
 </head>
 <body>
@@ -220,8 +280,11 @@
         const data = await response.json();
         const cosmoReply = data.reply;
 
-        // 🟢 FULLSCREEN HUD MODAL INTERCEPTOR & PARSER
-        if (cosmoReply.toUpperCase().includes("CRM HUD SECURED")) {
+        // 🟢 DUAL HUD INTERCEPTOR: CRM LOOKUPS & ACTIVE TASK LISTS
+        const replyUpper = cosmoReply.toUpperCase();
+
+        if (replyUpper.includes("CRM HUD SECURED")) {
+          // Track 1: Handle your CRM Profile Lookups (Completely untouched!)
           const parts = cosmoReply.split(" | ");
           const titleMatch = parts[0].match(/\[(.*?)\]/);
           const targetID = titleMatch ? titleMatch[1] : "UNKNOWN ID";
@@ -241,9 +304,16 @@
           
           document.getElementById('hud-modal-table').innerHTML = tableContent;
           document.getElementById('husky-hud-modal').style.display = 'flex';
+        } 
+        else if (replyUpper.includes("ACTIVE TASKS")) {
+          // Track 2: Handle your task board fetches beautifully
+          document.getElementById('hud-modal-title').innerText = "📊 TACTICAL BRIEFING: ACTIVE TASKS";
+          document.getElementById('hud-modal-table').innerHTML = `<tr><td colspan="2" style="padding: 10px 0 0 0; background: #020B1A;">${cosmoReply}</td></tr>`;
+          document.getElementById('husky-hud-modal').style.display = 'flex';
         }
-
-        outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>>> ' + cosmoReply.toUpperCase() + '</div></div>';
+      }
+       
+     outputTicker.innerHTML = '<div class="ticker-wrap"><div class="ticker-text" style="animation: scroll-ticker 8s linear infinite;">>>>> ' + cosmoReply.toUpperCase() + '</div></div>';
         if (!stealthMode) {
           if (!tempDeepgramToken) {
             const tokenRes = await fetch(COSMO_API_URL + "?request=deepgram_token&pawshake=AR_BUZZ_ALPHA_82_LOCKED");
